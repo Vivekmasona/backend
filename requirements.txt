@@ -1,5 +1,6 @@
 fastapi==0.88.0
 pytest==7.1.3
 pytest-asyncio==0.20.3
+duneanalytics==2.0.0
 uvicorn==0.20.0
 python-dotenv==0.21.1
