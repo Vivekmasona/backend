@@ -32,7 +32,7 @@ def dune():
 
     # fetch execution result
     data = dune.get_execution_result(result_id)
-    json_object = json.dumps(data, indent=4)
+    json_object = json.dumps(data)
 
     return json_object
 
