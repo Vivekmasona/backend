@@ -1,44 +1,52 @@
-from fastapi import FastAPI
-from duneanalytics import DuneAnalytics
-import json, os
-from dotenv import load_dotenv
+from pytube import YouTube
+from flask import Flask, session, url_for, send_file, render_template, redirect, request
+from io import BytesIO
 
-load_dotenv()
-DUNE_USER = os.getenv('DUNE_USER')
-DUNE_PASS = os.getenv('DUNE_PASS')
+app = Flask(__name__)
+app.config["SECRET_KEY"] = "my_secret_key"
 
-def dune():
-    # initialize client
-    dune = DuneAnalytics(DUNE_USER, DUNE_PASS)
+@app.route("/", methods=["POST", "GET"])
+def index():
+    if request.method == "POST":
+        session["link"] = request.form.get("url")
+        url = YouTube(session["link"])
+        url.check_availability()
+        return render_template("download.html", url=url)
 
-    # try to login
-    dune.login()
+    return render_template('index.html')
 
-    # fetch token
-    dune.fetch_auth_token()
+@app.route("/audio/<video_id>", methods=["GET"])
+def audio(video_id):
+    youtube_link = f"https://www.youtube.com/watch?v={video_id}"
+    buffer = BytesIO()
+    url = YouTube(youtube_link)
+    audio_stream = url.streams.filter(only_audio=True).first()
 
-    # fetch query result id using query id
-    # query id for any query can be found from the url of the query:
-    # for example: 
+    if audio_stream:
+        audio_stream.stream_to_buffer(buffer)
+        buffer.seek(0)
 
-    # Total USD amount: https://dune.com/queries/1975748/3265623
-    # Unique addresses: https://dune.com/queries/1975748/3266155
-    # Contributions: https://dune.com/queries/1975748/3266160
+        return send_file(buffer, as_attachment=True, download_name=f"{url.title}.mp3", mimetype="audio/mpeg")
 
-    # Contributor list: https://dune.com/queries/1976770/3266196
-    # Donations over time chart: https://dune.com/queries/1979561/3271445
+    return "Invalid or missing YouTube link parameter."
 
-    result_id = dune.query_result_id_v3(query_id=1975748)
+@app.route("/video", methods=["GET"])
+def download():
+    youtube_link = request.args.get("url")
+    if youtube_link:
+        buffer = BytesIO()
+        url = YouTube(youtube_link)
+        video = url.streams.get_highest_resolution()
 
-    # fetch execution result
-    data = dune.get_execution_result(result_id)
-    json_object = json.dumps(data)
+        # Stream the video to the buffer
+        video.stream_to_buffer(buffer)
+        buffer.seek(0)
 
-    return json_object
+        return send_file(buffer, as_attachment=True, download_name=video.title, mimetype=video.mime_type)
 
-app = FastAPI()
+    return "Invalid or missing YouTube link parameter."
 
-@app.get("/")
-async def root():
-    return {"result": dune()}
+if __name__ == '__main__':
+    app.run(debug=True)
+
 
